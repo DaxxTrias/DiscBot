@@ -110,6 +110,7 @@ namespace DiscBot
             if (logChannel != null)
             {
                 Console.WriteLine("Server update event, log channel identified as: " + logChannel.Name);
+                await logChannel.SendMessage($@"`{prettyCurrentTime}` Big Brother has arrived. (**Startup** completed)");
             }
         }
         private async void ChannelCreated(object sender, ChannelEventArgs e)
