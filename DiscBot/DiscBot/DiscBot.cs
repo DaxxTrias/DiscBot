@@ -14,7 +14,7 @@ namespace DiscBot
         static void Main() => new DiscBot().Start();
 
         public static DiscordClient Client { get; private set; }
-        public static TimeSpan UpTime { get; set; }
+        private static TimeSpan UpTime { get; set; }
         private string prettyCurrentTime => $"【{DateTime.Now:HH:mm:ss}】";
         private string curruntRunningTime => $" [{UpTime:g}] ";
         //public static Credentials Creds { get; set; }
@@ -117,7 +117,7 @@ namespace DiscBot
         private async void UsrJoined(object sender, UserEventArgs e)
         {
             var logchannel = e.Server.FindChannels("logs").FirstOrDefault();
-            await logchannel.SendMessage(e.User.Mention + " has joined the server");
+            await logchannel.SendMessage("`{ prettyCurrentTime}` " + e.User.Mention + " has joined the server");
             Console.WriteLine("[" + e.Server.Name + "] " + e.User.Name + "#" + e.User.Discriminator + " has joined the server");
             // should we turn this into a greet bot too?
             //await e.Server.DefaultChannel.SendMessage("Please welcome " + e.User.Mention + " to the server!");
@@ -125,7 +125,7 @@ namespace DiscBot
         private async void UsrLeft(object sender, UserEventArgs e)
         {
             var logchannel = e.Server.FindChannels("logs").FirstOrDefault();
-            await logchannel.SendMessage(e.User.Mention + " has Left the server");
+            await logchannel.SendMessage("`{ prettyCurrentTime}` " + e.User.Mention + " has Left the server");
             Console.WriteLine("[" + e.Server.Name + "] " + e.User.Name + "#" + e.User.Discriminator + " has left the server");
         }
         private async void UsrBanned(object sender, UserEventArgs e)
@@ -160,7 +160,10 @@ namespace DiscBot
                                 str += $"{e.Before.Name} has left **{beforeVch}** voice channel.";
                         }
                         else
+                        {
+                            Console.WriteLine("Unhandled trigger in VCH comparison");
                             return;
+                        }
                     }
 
                     //if (beforeVch != null)
@@ -203,7 +206,10 @@ namespace DiscBot
 
                 }
                 else
+                {
+                    Console.WriteLine("Unhandled trigger in general comparison");
                     return;
+                }
 
 
                 if (str != $"`{prettyCurrentTime}`")
@@ -213,8 +219,10 @@ namespace DiscBot
                 }
                 else
                 {
+                    // This seems to occur when a user moves from a channel we're not filtering for
+                    // Investigate why its not being picked up earlier (beside the fact my code is fugly)
                     //await logchannel.SendMessage("");
-                    Console.WriteLine("some sort of error / unhandled event triggered this");
+                    Console.WriteLine("Final unhandled triggered, investigate if this triggers");
                 }
 
                 //await logchannel.SendMessage(e.Before.Mention + " has had their permissions modified");
