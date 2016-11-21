@@ -16,6 +16,7 @@ namespace DiscBot
         public static DiscordClient Client { get; private set; }
         public static Channel logChannel { get; private set; }
         private static TimeSpan UpTime { get; set; }
+        private static Stopwatch timeSince { get; set; }
         private string prettyCurrentTime => $"【{DateTime.Now:HH:mm:ss}】";
         private string curruntRunningTime => $" [{UpTime:g}] ";
         //public static Credentials Creds { get; set; }
@@ -27,6 +28,8 @@ namespace DiscBot
                 {
                     x.LogLevel = LogSeverity.Info;
                 });
+
+            timeSince = new Stopwatch();
 
             Client.UsingCommands(x =>
             {
@@ -42,13 +45,24 @@ namespace DiscBot
                 .Description("Checks the bots status")
                 .Do(async (e) =>
                 {
-                    UpTime = DateTime.Now - Process.GetCurrentProcess().StartTime;
-                    await e.Channel.SendMessage("```DiscBot Status: \n" +
-                                                " .NET Version: " + Environment.Version + "\n" +
-                                                " OS Version: " + Environment.OSVersion + "\n" +
-                                                " DiscBot Version: " + Assembly.GetExecutingAssembly().GetName().Version + "\n" +
-                                                " Uptime: " + curruntRunningTime + "\n\n" +
-                                                " Made by Mildaria```");
+                    recheck:
+                    if (timeSince.ElapsedMilliseconds <= 0)
+                    {
+                        timeSince.Start();
+                        UpTime = DateTime.Now - Process.GetCurrentProcess().StartTime;
+                        await e.Channel.SendMessage("```DiscBot Status: \n" +
+                                                    " .NET Version: " + Environment.Version + "\n" +
+                                                    " OS Version: " + Environment.OSVersion + "\n" +
+                                                    " DiscBot Version: " + Assembly.GetExecutingAssembly().GetName().Version + "\n" +
+                                                    " Uptime: " + curruntRunningTime + "\n\n" +
+                                                    " Made by Mildaria```");
+                    }
+                    else if (timeSince.ElapsedMilliseconds > 10000)
+                    {
+                        // definitely not the most elegant solution, probably need to make a pulse timer to handle events like this in the future
+                        timeSince.Reset();
+                        goto recheck;
+                    }
                 });
 
             commands.CreateCommand("terminate")
@@ -82,7 +96,7 @@ namespace DiscBot
         private async void ChannelUpdated(object sender, ChannelUpdatedEventArgs e)
         {
             //todo permissions / user limit changes are also caught, but currently passed over
-            string str = $"`{prettyCurrentTime}`";
+            //string str = $"`{prettyCurrentTime}`";
             if (logChannel == null)
                 logChannel = e.Server.FindChannels("logs").FirstOrDefault();
 
@@ -125,7 +139,7 @@ namespace DiscBot
         {
             if (logChannel == null)
                 logChannel = e.Server.FindChannels("logs").FirstOrDefault();
-            await logChannel.SendMessage("`{ prettyCurrentTime}` " + e.User.Mention + " has joined the server");
+            await logChannel.SendMessage($"`{prettyCurrentTime}`" + e.User.Mention + " has joined the server");
             Console.WriteLine("[" + e.Server.Name + "] " + e.User.Name + "#" + e.User.Discriminator + " has joined the server");
             // should we turn this into a greet bot too?
             //await e.Server.DefaultChannel.SendMessage("Please welcome " + e.User.Mention + " to the server!");
@@ -134,7 +148,7 @@ namespace DiscBot
         {
             if (logChannel == null)
                 logChannel = e.Server.FindChannels("logs").FirstOrDefault();
-            await logChannel.SendMessage("`{ prettyCurrentTime}` " + e.User.Mention + " has Left the server");
+            await logChannel.SendMessage($"`{prettyCurrentTime}` " + e.User.Mention + " has Left the server");
             Console.WriteLine("[" + e.Server.Name + "] " + e.User.Name + "#" + e.User.Discriminator + " has left the server");
         }
         private async void UsrBanned(object sender, UserEventArgs e)
