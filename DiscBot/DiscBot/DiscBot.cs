@@ -15,6 +15,7 @@ namespace DiscBot
 
         public static DiscordClient Client { get; private set; }
         public static Channel logChannel { get; private set; }
+        private static bool firstStartUp = false;
         private static TimeSpan UpTime { get; set; }
         private static Stopwatch timeSince { get; set; }
         private string prettyCurrentTime => $"【{DateTime.Now:HH:mm:ss}】";
@@ -109,7 +110,7 @@ namespace DiscBot
                                             `Old:` {e.Before.Topic} `New:` {e.After.Topic}").ConfigureAwait(false);
 
             //await logchannel.SendMessage(str + "**" + e.Before.Name + "** channel has been modified");
-            Console.WriteLine("[" + e.Server.Name + "] " + e.Before.Name + "channel has been modified");
+            Console.WriteLine("[" + e.Server.Name + "] " + e.Before.Name + " channel has been modified");
         }
         private async void ChannelDestroyed(object sender, ChannelEventArgs e)
         {
@@ -121,10 +122,23 @@ namespace DiscBot
 
             // Should probably have this update anytime this event triggers?
             logChannel = e.Server.FindChannels("logs").FirstOrDefault();
-            if (logChannel != null)
+            if (!firstStartUp)
             {
-                Console.WriteLine("Server update event, log channel identified as: " + logChannel.Name);
-                await logChannel.SendMessage($@"`{prettyCurrentTime}` Big Brother has arrived. (**Startup** completed)");
+                if (logChannel != null)
+                {
+                    Console.WriteLine("Server update event, log channel identified as: " + logChannel.Name);
+                    Console.WriteLine("First update event handled.");
+                    await logChannel.SendMessage($@"`{prettyCurrentTime}` Big Brother has arrived. (**Startup** completed)");
+                }
+            }
+            else
+            {
+                if (logChannel != null)
+                {
+                    Console.WriteLine("Server update event, log channel identified as: " + logChannel.Name);
+                    Console.WriteLine("Subsequent update event handled.");
+                    await logChannel.SendMessage($@"`{prettyCurrentTime}` Big Brother has returned. (**Reconnected**)");
+                }
             }
         }
         private async void ChannelCreated(object sender, ChannelEventArgs e)
@@ -133,7 +147,10 @@ namespace DiscBot
         }
         private async void UsrUnbanned(object sender, UserEventArgs e)
         {
-
+            if (logChannel == null)
+                logChannel = e.Server.FindChannels("logs").FirstOrDefault();
+            await logChannel.SendMessage($"`{prettyCurrentTime}` " + e.User.Mention + " has been unbanned from the server");
+            Console.WriteLine("[" + e.Server.Name + "] " + e.User.Name + "#" + e.User.Discriminator + " has been unbanned from the server");
         }
         private async void UsrJoined(object sender, UserEventArgs e)
         {
@@ -155,7 +172,7 @@ namespace DiscBot
         {
             if (logChannel == null)
                 logChannel = e.Server.FindChannels("logs").FirstOrDefault();
-            await logChannel.SendMessage(e.User.Mention + " has been banned from the server");
+            await logChannel.SendMessage($"`{prettyCurrentTime}` " + e.User.Mention + " has been banned from the server");
             Console.WriteLine("[" + e.Server.Name + "] " + e.User.Name + "#" + e.User.Discriminator + " has been banned from the server");
         }
         private async void UsrUpdtd(object sender, UserUpdatedEventArgs e)
