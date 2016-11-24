@@ -130,6 +130,7 @@ namespace DiscBot
                     Console.WriteLine("First update event handled.");
                     await logChannel.SendMessage($@"`{prettyCurrentTime}` Big Brother has arrived. (**Startup** completed)");
                 }
+                firstStartUp = true;
             }
             else
             {
