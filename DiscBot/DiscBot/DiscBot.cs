@@ -199,6 +199,12 @@ namespace DiscBot
                         {
                             if (beforeVch.Name == "Raid" && afterVch.Name != "Raid")
                                 str += $"**{e.Before.Name}** has left **{beforeVch}** voice channel.";
+                            else
+                            {
+                                str += $"**{e.After.Name}** has joined **{afterVch}** voice channel.";
+                                Console.WriteLine(str);
+                                return;
+                            }
                         }
                         else
                         {
