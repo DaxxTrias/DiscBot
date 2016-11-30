@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
-using DiscBot.JSON;
+//using DiscBot.JSON;
 using Discord;
 using Discord.Commands;
 using System.Threading;
@@ -82,6 +82,7 @@ namespace DiscBot
             Client.UserLeft += UsrLeft;
             Client.UserJoined += UsrJoined;
             Client.UserBanned += UsrBanned;
+            Client.UserUnbanned += UsrUnbanned;
             Client.UserUpdated += UsrUpdtd;
             Client.ServerAvailable += SrvUpdtd;
 
