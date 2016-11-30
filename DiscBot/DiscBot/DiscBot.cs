@@ -1,20 +1,35 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
-//using DiscBot.JSON;
+using DiscBot.JSON;
 using Discord;
 using Discord.Commands;
 using System.Threading;
 using System.Diagnostics;
+using Discord.Modules;
+using Discord.Audio;
+using System.IO;
 
 namespace DiscBot
 {
+    public enum PermissionsLevel : byte
+    {
+        NoAccess = 0,
+        Users,
+        Mods,
+        Admins,
+        Owner,
+    }
     public class DiscBot
     {
         static void Main() => new DiscBot().Start();
 
         public static DiscordClient Client { get; private set; }
         public static Channel logChannel { get; private set; }
+        public static bool restartFlag { get; set; }
+        private configuration _config;
+        Player _player = new Player();
+        Playlist _playlist = new Playlist();
         private static bool firstStartUp = false;
         private static TimeSpan UpTime { get; set; }
         private static Stopwatch timeSince { get; set; }
@@ -23,11 +38,29 @@ namespace DiscBot
         //public static Credentials Creds { get; set; }
         //public static Config Config { get; set; }
 
+        public void loopRestart()
+        {
+            restartFlag = false;
+            while (restartFlag == false)
+            {
+                Start();
+            }
+        }
+
         public void Start()
         {
+            Playlist _playlist = new Playlist();
+
+
+            startupCheck();
+
+            _config = configuration.LoadFile(Directory.GetCurrentDirectory() + "\\configs\\config.json");
+
             Client = new DiscordClient(x =>
                 {
                     x.LogLevel = LogSeverity.Info;
+                    x.ConnectionTimeout = int.MaxValue;
+                    x.MessageCacheSize = 10;
                 });
 
             timeSince = new Stopwatch();
@@ -39,8 +72,19 @@ namespace DiscBot
                 x.AllowMentionPrefix = true;
                 x.HelpMode = HelpMode.Public;
             });
+            Client.UsingModules();
+            Client.UsingAudio(x =>
+            {
+                    x.Mode = AudioMode.Outgoing;
+                    x.EnableEncryption = true;
+                    x.Bitrate = AudioServiceConfig.MaxBitrate;
+                    x.BufferLength = 10000;
+            });
+            
+
 
             var commands = Client.GetService<CommandService>();
+            Client.GetService<AudioService>();
 
             commands.CreateCommand("status")
                 .Description("Checks the bots status")
@@ -65,6 +109,43 @@ namespace DiscBot
                         goto recheck;
                     }
                 });
+
+            commands.CreateCommand("play")
+                .AddCheck((cmd, u, ch) => u.Id == 170185463200481280)
+                .Alias("play")
+                .Parameter("url", ParameterType.Optional)
+                .Description("Adds the requested song to the queue.\rExample: !play url\rPermissions: Mods")
+                .Do(async (e) =>
+                {
+                    string str = $"`{prettyCurrentTime}`";
+                    if (e.GetArg("url") == "")
+                    {
+                        await e.Channel.SendMessage(str + $"{e.User.Mention}, Please give me a link so I can play the song for you.");
+                        return;
+                    }
+
+                    string result = await _playlist.cmd_play(e.GetArg("url"), e.User.Name);
+
+                    await e.Channel.SendMessage(result);
+                });
+
+            commands.CreateCommand("summon")
+                .AddCheck((cmd, u, ch) => u.Id == 170185463200481280)
+                .Alias("summon")
+                .Description("Summons bot to current voice channel and starts playing from the library.\rPermission: Everyone")
+                .Do(async (e) =>
+                    {
+                        try
+                        {
+                            Channel voiceChan = e.User.VoiceChannel;
+                            await voiceChan.JoinAudio();
+                            await _playlist.startAutoPlayList(voiceChan, Client);
+                        }
+                        catch (Exception t)
+                        {
+                            Console.WriteLine(t);
+                        }
+                    });
 
             commands.CreateCommand("terminate")
                 .AddCheck((cmd, u, ch) => u.Id == 170185463200481280)
@@ -95,6 +176,122 @@ namespace DiscBot
 
         }
 
+        private void startupCheck()
+        {
+            makeCacheFolder();
+            makeConfigFolder();
+            checkConfigFile();
+            checkToken();
+            setOwnerID();
+            checkCommandPrefix();
+        }
+
+        private void makeCacheFolder()
+        {
+            if (Directory.Exists("cache"))
+            {
+                return;
+            }
+            else
+            {
+                Directory.CreateDirectory("cache");
+            }
+        }
+        private void makeConfigFolder()
+        {
+            if (Directory.Exists("configs"))
+            {
+                return;
+            }
+            else
+            {
+                Directory.CreateDirectory("configs");
+            }
+        }
+
+        private void checkConfigFile()
+        {
+            var configPath = Directory.GetCurrentDirectory() + "\\configs\\config.json";
+
+            try
+            {
+                if (File.Exists(configPath))
+                {
+                    _config = configuration.LoadFile(configPath);
+                }
+                else
+                {
+                    _config = new configuration();
+                    _config.SaveFile(configPath);
+                }
+
+
+            }
+            catch
+            {
+                //unable to find the file
+                _config = new configuration();
+                _config.SaveFile(configPath);
+            }
+        }
+
+        private void checkToken()
+        {
+            //check for the bot token
+            try
+            {
+                _config = configuration.LoadFile(Directory.GetCurrentDirectory() + "\\configs\\config.json");
+                if (_config.Token != "")
+                {
+                    Console.WriteLine("Token has been found in config.json");
+                }
+                else
+                {
+                    Console.WriteLine("Please enter a valid token.");
+                    Console.Write("Token: ");
+
+                    _config.Token = Console.ReadLine();                     // Read the user's token from the console.
+                    _config.SaveFile(Directory.GetCurrentDirectory() + "\\configs\\config.json");
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error: " + e);
+            }
+        }
+
+        private void setOwnerID()
+        {
+            try
+            {
+                _config = configuration.LoadFile(Directory.GetCurrentDirectory() + "\\configs\\config.json");
+                //ulong ownerID = _config.Owner;
+
+                if (Int64.Parse(_config.Owner.ToString()) != 0)
+                {
+                    Console.WriteLine("Owner ID has been found in config.json");
+                }
+                else
+                {
+                    Console.WriteLine("Please enter your user ID to take ownership of this bot.");
+                    Console.Write("ID: ");
+
+                    ulong id = Convert.ToUInt64(Console.ReadLine());
+
+                    _config.Owner = id;
+                    _config.SaveFile(Directory.GetCurrentDirectory() + "\\configs\\config.json");
+                }
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine($"Error: {error}");
+            }
+        }
+
+        private void checkCommandPrefix()
+        {
+            Console.WriteLine("Current commandPrefix = " + _config.Prefix);
+        }
         private async void ChannelUpdated(object sender, ChannelUpdatedEventArgs e)
         {
             //todo permissions / user limit changes are also caught, but currently passed over
